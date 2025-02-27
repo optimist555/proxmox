@@ -27,11 +27,11 @@ What this how to covers:
 5. [Enable LUKS for root partition](#enable-luks-for-root-partition)
 
    - [ZFS (RAID1), ZFS (RAID10), ZFS (RAIDZ-1), ZFS (RAIDZ-2), ZFS (RAIDZ-3)](#zfs-raid1-zfs-raid10-zfs-raidz-1-zfs-raidz-2-zfs-raidz-3-2)
-       - Take offline one ZFS vdev (vitual device)
+       - Take offline one ZFS partition
        - Delete all data on the offline partition and create a LUKS (crypted) partition
        - Mount the crypted volume
-       - Replace the old vdev (vitual device) in the ZFS pool with the new empty crypted vdev (vitual device) and wait for resilvering to complete
-       - Repeat the same step for the other vdev (vitual device)
+       - Replace the old ZFS partition in the ZFS pool with the new empty crypted ZFS partition and wait for resilvering to complete
+       - Repeat the same step for the other ZFS partition
 6. [Fix the boot procedure](#fix-the-boot-procedure)
 
     Reconfigure the boot loader to be able to boot and asking for the LUKS password
@@ -40,7 +40,7 @@ What this how to covers:
    - [OPTIONAL: Add automated unlock via TPM](#optional-add-automated-unlock-via-tpm)
    - [OPTIONAL: Add automated unlock via USB key (not yet completed)](#optional-optional-add-automated-unlock-via-usb-key)
    - [OPTIONAL: Add automated unlock via remote server (MandOS)](#optional-add-automated-unlock-via-usb-key)
-7. [Enable LUKS for other disks](#enable-luks-for-other-disks)
+7. [Enable LUKS for other disks/partitions](#enable-luks-for-other-diskspartitions)
 8. [Troubleshooting](#troubleshooting)
 9. [Discussions](#discussions)
 
@@ -114,7 +114,7 @@ You can also reboot your node and you will see something like this on boot:
 
 ## Filesystem
 
-Check which filesystem and disk configuration you have.
+Check which filesystem, disk and partition configuration you have.
 
 Currently only the how to for `ZFS (RAID1)`, `ZFS (RAID10)`, `ZFS (RAIDZ-1)`, `ZFS (RAIDZ-2)`, `ZFS (RAIDZ-3)` is completed.
 
@@ -129,36 +129,14 @@ Meanwhile the single disk instructions are work in progress, you can check this 
 - https://privsec.dev/posts/linux/using-native-zfs-encryption-with-proxmox/
 - https://xiu.io/posts/18-proxmox-zfs-fde/
 
-### Single disk (🚨 HOW TO NOT YET COMPLETED, DO NOT TRY)
+### Single disk or bundled disks without redundancy (🚨 HOW TO NOT YET COMPLETED, DO NOT ATTEMPT)
 
-Your current disk setup should look similar to something like this:
+Your current disk and partition setup should look similar to something like this:
 
-#### ZFS
+#### EXT4, XFS
 
-```bash
-root@pve01:~# lsblk | grep -v zd
-NAME      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
-sda         8:0    0  1.8T  0 disk
-├─sda1      8:1    0 1007K  0 part
-├─sda2      8:2    0    1G  0 part
-└─sda3      8:3    0  1.8T  0 part
 ```
-
-or
-
-```bash
-root@pve01:~# lsblk | grep -v zd
-NAME        MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
-nvme0n1     259:0    0  1.8T  0 disk
-├─nvme0n1p1 259:1    0 1007K  0 part
-├─nvme0n1p2 259:2    0    1G  0 part
-└─nvme0n1p3 259:3    0  1.8T  0 part
-```
-
-#### EXT4
-
-```bash
-root@pve01:~# lsblk | grep -v zd
+root@pve01:~# lsblk
 NAME               MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
 sda                  8:0    0  1.8T  0 disk
 ├─sda1               8:1    0 1007K  0 part
@@ -174,8 +152,8 @@ sda                  8:0    0  1.8T  0 disk
 
 or
 
-```bash
-root@pve01:~# lsblk | grep -v zd
+```
+root@pve01:~# lsblk
 NAME               MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
 nvme0n1            259:0    0  1.8T  0 disk
 ├─nvme0n1p1        259:1    0 1007K  0 part
@@ -189,35 +167,61 @@ nvme0n1            259:0    0  1.8T  0 disk
     └─pve-data     252:4    0  1.8T  0 lvm
 ```
 
-#### BTRFS
+#### ZFS (RAID0)
 
-```bash
+```
 root@pve01:~# lsblk | grep -v zd
-NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
-sda      8:0    0  1.8T  0 disk
-├─sda1   8:1    0 1007K  0 part
-├─sda2   8:2    0    1G  0 part
-└─sda3   8:3    0  1.8T  0 part /
+NAME      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda         8:0    0  1.8T  0 disk
+├─sda1      8:1    0 1007K  0 part
+├─sda2      8:2    0    1G  0 part
+└─sda3      8:3    0  1.8T  0 part
+... or more disks and partitions
 ```
 
 or
 
-```bash
+```
 root@pve01:~# lsblk | grep -v zd
 NAME        MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
 nvme0n1     259:0    0  1.8T  0 disk
 ├─nvme0n1p1 259:1    0 1007K  0 part
 ├─nvme0n1p2 259:2    0    1G  0 part
+└─nvme0n1p3 259:3    0  1.8T  0 part
+... or more disks and partitions
+```
+
+#### BTRFS (RAID0)
+
+```
+root@pve01:~# lsblk
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda      8:0    0  1.8T  0 disk
+├─sda1   8:1    0 1007K  0 part
+├─sda2   8:2    0    1G  0 part
+└─sda3   8:3    0  1.8T  0 part /
+... or more disks and partitions
+```
+
+or
+
+```
+root@pve01:~# lsblk
+NAME        MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+nvme0n1     259:0    0  1.8T  0 disk
+├─nvme0n1p1 259:1    0 1007K  0 part
+├─nvme0n1p2 259:2    0    1G  0 part
 └─nvme0n1p3 259:3    0  1.8T  0 part /
+... or more disks and partitions
 ```
 
 ### ZFS (RAID1), ZFS (RAID10), ZFS (RAIDZ-1), ZFS (RAIDZ-2), ZFS (RAIDZ-3)
 
 #### Disk layout
 
-Your current disk setup should look similar to something like this:
+Your current disk and partition setup should look similar to something like this:
 
-```bash
+```
 root@pve01:~# lsblk | grep -v zd
 NAME      MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 sda         8:0    0   1.8T  0 disk
@@ -228,12 +232,12 @@ sdb         8:16   0   1.8T  0 disk
 ├─sdb1      8:17   0  1007K  0 part
 ├─sdb2      8:18   0     1G  0 part
 └─sdb3      8:19   0   1.8T  0 part
-... or more disks
+... or more disks and partitions
 ```
 
 or
 
-```bash
+```
 root@pve01:~# lsblk | grep -v zd
 NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 nvme0n1     259:0    0   1.8T  0 disk
@@ -244,12 +248,28 @@ nvme1n1     259:4    0   1.8T  0 disk
 ├─nvme1n1p1 259:5    0  1007K  0 part
 ├─nvme1n1p2 259:6    0     1G  0 part
 └─nvme1n1p3 259:7    0   1.8T  0 part
-... or more disks
+... or more disks and partitions
 ```
 
 #### ZFS pool
 
 Your current zpool setup should look similar to something like you find [here](#zfs-raid1-zfs-raid10-zfs-raidz-1-zfs-raidz-2-zfs-raidz-3-2).
+
+### BTRFS (RAID1), BTRFS (RAID10) (🚨 HOW TO NOT YET COMPLETED, DO NOT ATTEMPT)
+
+```
+root@pve01:~# lsblk
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda      8:0    0  1.8T  0 disk
+├─sda1   8:1    0 1007K  0 part
+├─sda2   8:2    0    1G  0 part /boot/efi
+└─sda3   8:3    0  1.8T  0 part /
+sdb      8:16   0  1.8T  0 disk
+├─sdb1   8:17   0 1007K  0 part
+├─sdb2   8:18   0    1G  0 part
+└─sdb3   8:19   0  1.8T  0 part
+... or more disks and partitions
+```
 
 # Backup data
 
@@ -290,9 +310,9 @@ dd if=/dev/zero of=/tmp/write_test.img bs=1G count=1 oflag=dsync; rm /tmp/write_
 
 # Enable LUKS for root partition
 
-The following steps depend on your selected filesystem and disk configuration. Currently only the how to for `ZFS (RAID1)`, `ZFS (RAID10)`, `ZFS (RAIDZ-1)`, `ZFS (RAIDZ-2)`, `ZFS (RAIDZ-3)` is completed.
+The following steps depend on your selected filesystem, disk and partition configuration. Currently only the how to for `ZFS (RAID1)`, `ZFS (RAID10)`, `ZFS (RAIDZ-1)`, `ZFS (RAIDZ-2)`, `ZFS (RAIDZ-3)` is completed.
 
-## Single disk (🚨 HOW TO NOT YET COMPLETED, DO NOT TRY)
+## Single disk or bundled disks without redundancy (🚨 HOW TO NOT YET COMPLETED, DO NOT ATTEMPT)
 
 Not yet completed.
 
@@ -304,12 +324,49 @@ Check the name of your disks and partitions with
 lsblk | grep -v zd
 ```
 
-In this guide I will use `sda3` and `sdb3`. in case your disk names are different, you have to change them in the commands.
+In this guide, I will use `sda3` and `sdb3`. If your disk names are different, you will need to adjust the commands accordingly.
+
+Here are some common disk names for different types of physical devices:
+
+- **SATA/SAS HDD/SSD**: `sda`, `sdb`, `sdc`, etc.
+
+  Partition 3 would be `sda3`, `sdb3`, `sdc3`, etc.
+- **NVMe SSD**: `nvme0n1`, `nvme1n1`, `nvme2n1`, etc.
+
+  Partition 3 would be `nvme0n1p3`, `nvme1n1p3`, `nvme2n1p3`, etc.
 
 Check the current ZFS pool status this command and check that everything is `ONLINE` and not `DEGRADED`.
 
 ```bash
 zpool status
+```
+
+Identify which ZFS partition in `zpool status` corresponds to which disk partition by using the following command:
+
+```bash
+ls -l /dev/disk/by-id/ | grep part3
+```
+
+Example outputs:
+
+```
+root@pve01:~# ls -l /dev/disk/by-id/ | grep part3
+lrwxrwxrwx 1 root root 10 Jan  8 03:17 ata-KINGSTON_SEDC600M960G_50026B7686E0B30F-part3 -> ../../sdb3
+lrwxrwxrwx 1 root root 10 Jan  8 03:17 ata-KINGSTON_SEDC600M960G_50026B7686E0B385-part3 -> ../../sda3
+lrwxrwxrwx 1 root root 10 Jan  8 03:17 wwn-0x50026b7686e0b30f-part3 -> ../../sdb3
+lrwxrwxrwx 1 root root 10 Jan  8 03:17 wwn-0x50026b7686e0b385-part3 -> ../../sda3
+... or more partitions
+```
+
+```
+root@pve01:~# ls -l /dev/disk/by-id/ | grep part3
+lrwxrwxrwx 1 root root 15 Feb 13 09:41 nvme-eui.e8238fa6bf530001001b448b4d638ea9-part3 -> ../../nvme1n1p3
+lrwxrwxrwx 1 root root 15 Feb 13 09:41 nvme-eui.e8238fa6bf530001001b448b4d638eab-part3 -> ../../nvme0n1p3
+lrwxrwxrwx 1 root root 15 Feb 13 09:41 nvme-Samsung_SSD_970_EVO_Plus_1TB_245023800929_1-part3 -> ../../nvme1n1p3
+lrwxrwxrwx 1 root root 15 Feb 13 09:41 nvme-Samsung_SSD_970_EVO_Plus_1TB_245023800929-part3 -> ../../nvme1n1p3
+lrwxrwxrwx 1 root root 15 Feb 13 09:41 nvme-Samsung_SSD_970_EVO_Plus_1TB_245023800931_1-part3 -> ../../nvme0n1p3
+lrwxrwxrwx 1 root root 15 Feb 13 09:41 nvme-Samsung_SSD_970_EVO_Plus_1TB_245023800931-part3 -> ../../nvme0n1p3
+... or more partitions
 ```
 
 **ZFS (RAID1)**
@@ -385,6 +442,7 @@ errors: No known data errors
 **ZFS RAIDZ-x**
 
 Depending on what RAIDZ configuration you have one small number changes:
+
 - `raidz1-0` -> ZFS RAIDZ-1
 - `raidz2-0` -> ZFS RAIDZ-2
 - `raidz3-0` -> ZFS RAIDZ-3
@@ -401,7 +459,7 @@ config:
             ata-KINGSTON_SEDC600M960G_50026B7686E0B385-part3  ONLINE       0     0     0
             ata-KINGSTON_SEDC600M960G_50026B7686E0B30F-part3  ONLINE       0     0     0
             ata-KINGSTON_SEDC600M960G_50026B7686E0B332-part3  ONLINE       0     0     0
-            ... or more disks
+            ... or more ZFS partitions
 
 errors: No known data errors
 ```
@@ -418,80 +476,34 @@ config:
             nvme-CT2000P3PSSD8_2451E99B985B-part3  ONLINE       0     0     0
             nvme-CT2000P3PSSD8_2451E99B98F4-part3  ONLINE       0     0     0
             nvme-CT2000P3PSSD8_2451E99B9906-part3  ONLINE       0     0     0
-            ... or more disks
+            ... or more ZFS partitions
 
 errors: No known data errors
 ```
 
-Should your disks have an UUID in `zpool status` instead of the disk and partition name you can find the association with
-
-```bash
-ls -l /dev/disk/by-id/ | grep part3
-```
-
 **🚨 NOTE:** If you haven't made a backup yet, this is your last chance to do so. Refer to the [backup instructions](#backup-data).
 
-Take the `sdb3` offline in the ZFS pool:
+#### Repeat this step for every ZFS partition
+
+Start with partition 3 of the first disk `sda3`, proceed with partition 3 of the second disk `sdb3`, etc.
+
+Take the `sda3` offline in the ZFS pool (if you don't know where this ID came from, see the instructions above):
 
 ```bash
-zpool offline rpool sdb3
+zpool offline rpool ata-KINGSTON_SEDC600M960G_50026B7686E0B385-part3
 ```
 
-Check the pool status again to ensure the disk was successfully taken offline:
+Check the pool status again to ensure the ZFS partition was successfully taken offline:
 
 ```bash
 zpool status
 ```
 
-Now that `sdb3` is offline from the pool, you can encrypt it using LUKS. Enter this command to encrypt with 512-bit.
+Now that `sda3` is offline from the pool, you can encrypt it using LUKS. Enter this command to encrypt with 512-bit.
 
 **⚠️ NOTE:** The key size you see (512-bit) is actually two 256-bit. AES-XTS requires two keys: one for encryption and one as a tweak key.
 
-```bash
-cryptsetup luksFormat --cipher aes-xts-plain64 --key-size 512 --hash sha512 --use-random /dev/sdb3
-```
-
-confirm with `YES` (needs to be uppercase) and then enter your encryption password.
-
-Open the LUKS-encrypted partition:
-
-```bash
-cryptsetup luksOpen /dev/sdb3 luks-sdb3
-```
-
-Now that `sdb3` is encrypted, you can replace the old unencrypted offline disk with the new encrypted disk in the ZFS pool:
-
-```bash
-zpool replace rpool sdb3 /dev/mapper/luks-sdb3
-```
-
-The system will begin to resilver and copy the data from `sda3` onto the new `luks-sdb3` disk.
-
-Wait for the resilvering process to finish. This may take some time depending on the amount of data in your pool.
-
-You can monitor the progress by checking:
-
-```bash
-zpool status
-```
-
-Once the resilvering is complete, proceed with encrypting `sda3` in the same way:
-
-Take the `sda3` offline in the ZFS pool:
-
-```bash
-zpool offline rpool sda3
-```
-
-Check the pool status again to ensure the disk was successfully taken offline:
-
-```bash
-zpool status
-```
-
-Now that `sda3` is offline in the pool, you can encrypt it using LUKS. Enter this command to encrypt with 512-bit.
-
-**⚠️ NOTE:** The key size you see (512-bit) is actually two 256-bit. AES-XTS requires two keys: one for encryption and one as a tweak key.
+**⚠️ NOTE:** Make sure you only delete the 3rd partition of your disk and not the whole disk. `sda3`, `sdb3`, `sdc3`, etc. or `nvme0n1p3`, `nvme1n1p3`, `nvme2n1p3`, etc.
 
 ```bash
 cryptsetup luksFormat --cipher aes-xts-plain64 --key-size 512 --hash sha512 --use-random /dev/sda3
@@ -505,13 +517,13 @@ Open the LUKS-encrypted partition:
 cryptsetup luksOpen /dev/sda3 luks-sda3
 ```
 
-Now that `sda3` is encrypted, you can replace the old unencrypted offline disk with the new encrypted disk in the ZFS pool:
+Now that `sda3` is encrypted, you can replace the old unencrypted offline vedv with the new encrypted vedv in the ZFS pool:
 
 ```bash
 zpool replace rpool sda3 /dev/mapper/luks-sda3
 ```
 
-The system will begin to resilver and copy the data from `sdb3` onto the new `luks-sda3` disk.
+The system will begin to resilver and copy the data from the other ZFS partition(s) to `sda3`
 
 Wait for the resilvering process to finish. This may take some time depending on the amount of data in your pool.
 
@@ -521,7 +533,13 @@ You can monitor the progress by checking:
 zpool status
 ```
 
+Once the resilvering is complete, [repeat this step for every ZFS partition](#repeat-this-step-for-every-zfs-partition).
+
 **⚠️ NOTE:** Your system now will not boot anymore, you need to execute also the next step!
+
+## BTRFS (RAID1), BTRFS (RAID10) (🚨 HOW TO NOT YET COMPLETED, DO NOT ATTEMPT)
+
+Not yet completed.
 
 # Fix the boot procedure
 
@@ -535,7 +553,7 @@ This is the most basic step and the password will be requested at every boot.
 
 **⚠️ NOTE:** If you don't do this, your system will not boot again without a live USB/CD
 
-Get the `UUID`'s of the encrypted disks:
+Get the `UUID`'s of the encrypted partitions:
 
 ```bash
 lsblk -o NAME,PATH,UUID,WWN,MOUNTPOINTS,FSTYPE,LABEL,MODEL,SERIAL | grep -v "/dev/zd"
@@ -547,14 +565,14 @@ or
 blkid | grep "/dev/[a-z0-9]*3" | grep -v "/dev/zd"
 ```
 
-Modify the crypttab file `/etc/crypttab` by adding these lines. Replace disk `UUID` with the values fetched before.
+Modify the crypttab file `/etc/crypttab` by adding these lines. Replace the partition `UUID` with the values fetched before.
 
 **⚠️ NOTE:** Pay attention to copy the `UUID` and NOT the `UUID_SUB` or `PARTUUID`!
 
 ```
-luks-sda3 UUID="<disk UUID>" none luks,discard,initramfs
-luks-sdb3 UUID="<disk UUID>" none luks,discard,initramfs
-... eventually further disks of the root partition/rpool (root ZFS partition)
+luks-sda3 UUID="<partition UUID>" none luks,discard,initramfs
+luks-sdb3 UUID="<partition UUID>" none luks,discard,initramfs
+... eventually further partitions of the root partition/rpool (root ZFS partition)
 ```
 
 Check, if your kernel cmdline file `/etc/kernel/cmdline` looks like this:
@@ -563,11 +581,11 @@ Check, if your kernel cmdline file `/etc/kernel/cmdline` looks like this:
 root=ZFS=rpool/ROOT/pve-1 boot=zfs
 ```
 
-Then overwrite the kernel cmdline file `/etc/kernel/cmdline` with this command. Make sure you add all disks that are in the `rpool` (root ZFS pool) and need to be decrypted on boot:
+Then overwrite the kernel cmdline file `/etc/kernel/cmdline` with this command. Make sure you add all partitions that are in the `rpool` (root ZFS pool) and need to be decrypted on boot:
 
 ```bash
 # For ZFS (RAID1), ZFS (RAID10), ZFS (RAIDZ-1), ZFS (RAIDZ-2), ZFS (RAIDZ-3)
-# You need to add all disks of the rpool (root ZFS pool)
+# You need to add all ZFS partitions of the rpool (root ZFS pool)
 echo 'cryptdevice=/dev/sda3:luks-sda3 cryptdevice=/dev/sdb3:luks-sdb3 root=ZFS=rpool/ROOT/pve-1 resume=/dev/mapper/luks-sda3 resume=/dev/mapper/luks-sdb3 boot=zfs' > /etc/kernel/cmdline
 ```
 
@@ -641,7 +659,6 @@ IP=192.168.1.27::192.168.1.1:255.255.255.0:hostname:enp3s0
 ```
 
 More information can be found in the nfsroot section of the kernel documentation: https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt
-
 
 Update initramfs with this command:
 
@@ -729,7 +746,7 @@ proxmox-boot-tool refresh
 
 - https://www.recompile.se/mandos
 
-# Enable LUKS for other disks
+# Enable LUKS for other disks/partitions
 
 Not available yet, will develop with time.
 

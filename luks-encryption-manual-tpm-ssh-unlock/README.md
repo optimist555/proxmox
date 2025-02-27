@@ -41,6 +41,8 @@ What this how to covers:
    - [OPTIONAL: Add automated unlock via USB key (not yet completed)](#optional-optional-add-automated-unlock-via-usb-key)
    - [OPTIONAL: Add automated unlock via remote server (MandOS)](#optional-add-automated-unlock-via-usb-key)
 7. [Enable LUKS for other disks](#enable-luks-for-other-disks)
+8. [Troubleshooting](#troubleshooting)
+9. [Discussions](#discussions)
 
 ## Support maintaining this guide
 
@@ -536,6 +538,12 @@ This is the most basic step and the password will be requested at every boot.
 Get the `UUID`'s of the encrypted disks:
 
 ```bash
+lsblk -o NAME,PATH,UUID,WWN,MOUNTPOINTS,FSTYPE,LABEL,MODEL,SERIAL | grep -v "/dev/zd"
+```
+
+or
+
+```bash
 blkid | grep "/dev/[a-z0-9]*3" | grep -v "/dev/zd"
 ```
 
@@ -723,4 +731,15 @@ proxmox-boot-tool refresh
 
 # Enable LUKS for other disks
 
-Not available yet
+Not available yet, will develop with time.
+
+# Troubleshooting
+
+Not available yet, will develop with discussions and time.
+
+# Discussions
+
+If you have problems, suggestions or you just want to share your experience you can do it here:
+
+- [GitHub Discussions of this repository](https://github.com/mr-manuel/proxmox/discussions)
+- [Proxmox Forum -> Encrypt complete Proxmox VE node with LUKS](https://forum.proxmox.com/threads/encrypt-complete-proxmox-ve-node-with-luks.162938/)

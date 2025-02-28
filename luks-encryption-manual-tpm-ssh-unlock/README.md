@@ -20,7 +20,7 @@ What this how to covers:
    - [Boot loader](#boot-loader)
        - [GRUB](#grub)
        - [systemd-boot](#systemd-boot)
-   - [Filesystem](#filesystem)
+   - [Filesystem and disk configuration](#filesystem-and-disk-configuration)
        - [ZFS (RAID1), ZFS (RAID10), ZFS (RAIDZ-1), ZFS (RAIDZ-2), ZFS (RAIDZ-3)](#zfs-raid1-zfs-raid10-zfs-raidz-1-zfs-raidz-2-zfs-raidz-3-1)
 3. [Backup data](#backup-data)
 4. [Install requirements](#install-requirements)
@@ -112,13 +112,13 @@ You can also reboot your node and you will see something like this on boot:
 
 ![systemd-boot](./img/systemd-boot.png)
 
-## Filesystem
+## Filesystem and disk configuration
 
 Check which filesystem, disk and partition configuration you have.
 
 Currently only the how to for `ZFS (RAID1)`, `ZFS (RAID10)`, `ZFS (RAIDZ-1)`, `ZFS (RAIDZ-2)`, `ZFS (RAIDZ-3)` is completed.
 
-Meanwhile the single disk instructions are work in progress, you can check this tutorial:
+Meanwhile the single disk or bundled disks without redundancy instructions are work in progress, you can check this tutorials:
 
 - https://forum.proxmox.com/threads/adding-full-disk-encryption-to-proxmox.137051/
 - https://gist.github.com/yvesh/ae77a68414484c8c79da03c4a4f6fd55
@@ -134,6 +134,26 @@ Meanwhile the single disk instructions are work in progress, you can check this 
 Your current disk and partition setup should look similar to something like this:
 
 #### EXT4, XFS
+
+**Filesystem**
+
+EXT4
+
+```
+root@pve01:~# df -T /
+Filesystem           Type 1K-blocks    Used Available Use% Mounted on
+/dev/mapper/pve-root ext4 100597760 3417040  97180720   4% /
+```
+
+XFS
+
+```
+root@pve01:~# df -T /
+Filesystem           Type 1K-blocks    Used Available Use% Mounted on
+/dev/mapper/pve-root xfs  100597760 3417040  97180720   4% /
+```
+
+**Disk layout**
 
 ```
 root@pve01:~# lsblk
@@ -169,6 +189,16 @@ nvme0n1            259:0    0  1.8T  0 disk
 
 #### ZFS (RAID0)
 
+**Filesystem**
+
+```
+root@pve01:~# df -T /
+Filesystem       Type 1K-blocks    Used Available Use% Mounted on
+rpool/ROOT/pve-1 zfs  824576000 5292672 819283328   1% /
+```
+
+**Disk layout**
+
 ```
 root@pve01:~# lsblk | grep -v zd
 NAME      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
@@ -191,7 +221,27 @@ nvme0n1     259:0    0  1.8T  0 disk
 ... or more disks and partitions
 ```
 
+**ZFS pool**
+
+The output of this command
+
+```bash
+zpool status
+```
+
+should directly show a disk name below the line `rpool` and NOT contain `mirror...` or `raidz...`.
+
 #### BTRFS (RAID0)
+
+**Filesystem**
+
+```
+root@pve01:~# df -T /
+Filesystem     Type  1K-blocks    Used Available Use% Mounted on
+/dev/sda3      btrfs  30931948 2812168  27116120  10% /
+```
+
+**Disk layout**
 
 ```
 root@pve01:~# lsblk
@@ -215,9 +265,97 @@ nvme0n1     259:0    0  1.8T  0 disk
 ... or more disks and partitions
 ```
 
+**BTRFS filesystem usage and configuration details**
+
+The output of this command
+
+```bash
+root@pve01:~# btrfs fi usage /
+```
+
+should look something like this and contain `Data,single`
+
+```
+Overall:
+    Device size:                   1.80TiB
+    Device allocated:              4.52GiB
+    Device unallocated:            1.79TiB
+    Device missing:                  0.00B
+    Device slack:                  3.50KiB
+    Used:                          2.67GiB
+    Free (estimated):              1.79TiB      (min: 1.79TiB)
+    Free (statfs, df):             1.79TiB
+    Data ratio:                       1.00
+    Metadata ratio:                   1.00
+    Global reserve:                5.94MiB      (used: 0.00B)
+    Multiple profiles:                  no
+
+Data,single: Size:4.01GiB, Used:2.63GiB (65.59%)
+   /dev/sda3       4.01GiB
+
+Metadata,single: Size:520.00MiB, Used:47.47MiB (9.13%)
+   /dev/sda3     520.00MiB
+
+System,single: Size:4.00MiB, Used:16.00KiB (0.39%)
+   /dev/sda3       4.00MiB
+
+Unallocated:
+   /dev/sda3       1.79TiB
+```
+
+or `Data,RAID0`
+
+```
+Overall:
+    Device size:                   3.60TiB
+    Device allocated:              7.02GiB
+    Device unallocated:            3.59TiB
+    Device missing:                  0.00B
+    Device slack:                  7.00KiB
+    Used:                          2.51GiB
+    Free (estimated):              3.59TiB      (min: 3.59TiB)
+    Free (statfs, df):             5.59TiB
+    Data ratio:                       1.00
+    Metadata ratio:                   1.00
+    Global reserve:                5.94MiB      (used: 0.00B)
+    Multiple profiles:                  no
+
+Data,RAID0: Size:6.00GiB, Used:2.47GiB (41.15%)
+   /dev/sda3       4.01GiB
+   /dev/sdb3       4.01GiB
+   ... or more partitions
+
+Metadata,RAID0: Size:1.00GiB, Used:47.22MiB (4.61%)
+   /dev/sda3     512.00MiB
+   /dev/sdb3     512.00MiB
+   ... or more partitions
+
+System,RAID0: Size:16.00MiB, Used:16.00KiB (0.10%)
+   /dev/sda3       8.00MiB
+   /dev/sdb3       8.00MiB
+   ... or more partitions
+
+Unallocated:
+   /dev/sda3       3.59TiB
+   /dev/sdb3       3.59TiB
+   ... or more partitions
+```
+
+
+
+
+
 ### ZFS (RAID1), ZFS (RAID10), ZFS (RAIDZ-1), ZFS (RAIDZ-2), ZFS (RAIDZ-3)
 
-#### Disk layout
+**Filesystem**
+
+```
+root@pve01:~# df -T /
+Filesystem       Type 1K-blocks    Used Available Use% Mounted on
+rpool/ROOT/pve-1 zfs  824576000 5292672 819283328   1% /
+```
+
+**Disk layout**
 
 Your current disk and partition setup should look similar to something like this:
 
@@ -251,11 +389,27 @@ nvme1n1     259:4    0   1.8T  0 disk
 ... or more disks and partitions
 ```
 
-#### ZFS pool
+**ZFS pool**
 
-Your current zpool setup should look similar to something like you find [here](#zfs-raid1-zfs-raid10-zfs-raidz-1-zfs-raidz-2-zfs-raidz-3-2).
+The output of this command
+
+```bash
+zpool status
+```
+
+should contain `mirror...` or `raidz...` below the line `rpool`. See also in the middle of [this](#zfs-raid1-zfs-raid10-zfs-raidz-1-zfs-raidz-2-zfs-raidz-3-2) section.
 
 ### BTRFS (RAID1), BTRFS (RAID10) (🚨 HOW TO NOT YET COMPLETED, DO NOT ATTEMPT)
+
+**Filesystem**
+
+```
+root@pve01:~# df -T /
+Filesystem     Type  1K-blocks    Used Available Use% Mounted on
+/dev/sda3      btrfs  30931948 2812168  27116120  10% /
+```
+
+**Disk layout**
 
 ```
 root@pve01:~# lsblk
@@ -269,6 +423,98 @@ sdb      8:16   0  1.8T  0 disk
 ├─sdb2   8:18   0    1G  0 part
 └─sdb3   8:19   0  1.8T  0 part
 ... or more disks and partitions
+```
+
+or
+
+```
+root@pve01:~# lsblk
+NAME        MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+nvme0n1       8:0    0  1.8T  0 disk
+├─nvme0n1p1   8:1    0 1007K  0 part
+├─nvme0n1p2   8:2    0    1G  0 part /boot/efi
+└─nvme0n1p3   8:3    0  1.8T  0 part /
+nvme1n1       8:16   0  1.8T  0 disk
+├─nvme1n1p1   8:17   0 1007K  0 part
+├─nvme1n1p2   8:18   0    1G  0 part
+└─nvme1n1p3   8:19   0  1.8T  0 part
+... or more disks and partitions
+```
+
+**BTRFS filesystem usage and configuration details**
+
+The output of this command
+
+```bash
+root@pve01:~# btrfs fi usage /
+```
+
+should contain
+
+```
+Overall:
+    Device size:                   3.60TiB
+    Device allocated:             10.02GiB
+    Device unallocated:            3.59TiB
+    Device missing:                  0.00B
+    Device slack:                  7.00KiB
+    Used:                          5.35GiB
+    Free (estimated):              3.59TiB      (min: 3.59TiB)
+    Free (statfs, df):             3.59TiB
+    Data ratio:                       2.00
+    Metadata ratio:                   2.00
+    Global reserve:                5.64MiB      (used: 0.00B)
+    Multiple profiles:                  no
+
+Data,RAID1: Size:4.00GiB, Used:2.63GiB (65.75%)
+   /dev/sda3       4.00GiB
+   /dev/sdb3       4.00GiB
+
+Metadata,RAID1: Size:1.00GiB, Used:47.27MiB (4.62%)
+   /dev/sda3       1.00GiB
+   /dev/sdb3       1.00GiB
+
+System,RAID1: Size:8.00MiB, Used:16.00KiB (0.20%)
+   /dev/sda3       8.00MiB
+   /dev/sdb3       8.00MiB
+
+Unallocated:
+   /dev/sda3       3.59TiB
+   /dev/sdb3       3.59TiB
+```
+
+or
+
+```
+Overall:
+    Device size:                   3.60TiB
+    Device allocated:             10.02GiB
+    Device unallocated:            3.59TiB
+    Device missing:                  0.00B
+    Device slack:                  7.00KiB
+    Used:                          5.35GiB
+    Free (estimated):              3.59TiB      (min: 3.59TiB)
+    Free (statfs, df):             3.59TiB
+    Data ratio:                       2.00
+    Metadata ratio:                   2.00
+    Global reserve:                5.64MiB      (used: 0.00B)
+    Multiple profiles:                  no
+
+Data,RAID1: Size:4.00GiB, Used:2.63GiB (65.75%)
+   /dev/nvme0n1p3       4.00GiB
+   /dev/nvme1n1p3       4.00GiB
+
+Metadata,RAID1: Size:1.00GiB, Used:47.27MiB (4.62%)
+   /dev/nvme0n1p3       1.00GiB
+   /dev/nvme1n1p3       1.00GiB
+
+System,RAID1: Size:8.00MiB, Used:16.00KiB (0.20%)
+   /dev/nvme0n1p3       8.00MiB
+   /dev/nvme1n1p3       8.00MiB
+
+Unallocated:
+   /dev/nvme0n1p3       3.59TiB
+   /dev/nvme1n1p3       3.59TiB
 ```
 
 # Backup data

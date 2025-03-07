@@ -763,6 +763,14 @@ Open the LUKS-encrypted partition:
 cryptsetup luksOpen /dev/sda3 luks-sda3
 ```
 
+Save the LUKS header for disaster recovery. Make sure to save the header in a safe location, since with it you can unlock the partition.
+
+# https://www.cyberciti.biz/security/how-to-backup-and-restore-luks-header-on-linux/
+
+```bash
+cryptsetup luksHeaderBackup /dev/sda3 --header-backup-file /path/to/backupfile/sda3-luks-header
+```
+
 Now that `sda3` is encrypted, you can replace the old unencrypted offline vedv with the new encrypted vedv in the ZFS pool:
 
 ```bash

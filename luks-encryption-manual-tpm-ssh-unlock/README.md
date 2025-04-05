@@ -765,16 +765,16 @@ cryptsetup luksOpen /dev/sda3 luks-sda3
 
 Save the LUKS header for disaster recovery. Make sure to save the header in a safe location, since with it you can unlock the partition.
 
-# https://www.cyberciti.biz/security/how-to-backup-and-restore-luks-header-on-linux/
+See also https://www.cyberciti.biz/security/how-to-backup-and-restore-luks-header-on-linux/
 
 ```bash
 cryptsetup luksHeaderBackup /dev/sda3 --header-backup-file /path/to/backupfile/sda3-luks-header
 ```
 
-Now that `sda3` is encrypted, you can replace the old unencrypted offline vedv with the new encrypted vedv in the ZFS pool:
+Now that `sda3` is encrypted, you can replace the old unencrypted offline vdev with the new encrypted vdev in the ZFS pool (if you don't know where this ID came from, see the instructions above):
 
 ```bash
-zpool replace rpool sda3 /dev/mapper/luks-sda3
+zpool replace rpool ata-KINGSTON_SEDC600M960G_50026B7686E0B385-part3 /dev/mapper/luks-sda3
 ```
 
 The system will begin to resilver and copy the data from the other ZFS partition(s) to `sda3`

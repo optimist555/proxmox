@@ -821,11 +821,11 @@ blkid | grep "/dev/[a-z0-9]*3" | grep -v "/dev/zd"
 
 Modify the crypttab file `/etc/crypttab` by adding these lines. Replace the partition `UUID` with the values fetched before.
 
-**⚠️ NOTE:** Pay attention to copy the `UUID` and NOT the `UUID_SUB` or `PARTUUID`!
+**⚠️ NOTE:** Pay attention to copy the `UUID` and NOT the `UUID_SUB` or `PARTUUID`! Each encrypted volume has its own `UUID`.
 
 ```
-luks-sda3 UUID="<partition UUID>" none luks,discard,initramfs
-luks-sdb3 UUID="<partition UUID>" none luks,discard,initramfs
+luks-sda3 UUID="<partition UUID-1>" none luks,discard,initramfs
+luks-sdb3 UUID="<partition UUID-2>" none luks,discard,initramfs
 ... eventually further partitions of the root partition/rpool (root ZFS partition)
 ```
 

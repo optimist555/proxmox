@@ -1120,9 +1120,79 @@ proxmox-boot-tool refresh
 
 - https://blog.fidelramos.net/software/unlock-luks-usb-drive
 
-## OPTIONAL: Add automated unlock via remote server (MandOS)
+## OPTIONAL: Add automated unlock via remote server (Mandos)
 
+Mandos is a software for remote unattended unlock of encrypted root file systems.
+It can be used in conjunction with other remote unlock methods, like dropbear-initramfs.
 - https://www.recompile.se/mandos
+- https://www.youtube.com/watch?v=b3UaXAP2juk
+
+You will need to install the Mandos server on a separate system.
+This will preferably be Debian or Ubuntu based as Mandos is in the software repositories of these distributions, but with manual installation it can be used with other distributions as well.
+It can be a virtual machine, container, bare metal server, separate SBC like Raspberry Pi or similar (preferred) or directly one or more of your other PVE hosts if you run a cluster.
+Your cluster nodes can then be server and client for the other hosts.
+Mandos can be installed with `apt` using standard Debian repositories directly in Proxmox.
+For Mandos to work without configuration it is important that the system has a network interface that provides a IPv6 link-local address `(fe80::****).`
+
+### Client side
+Perform the following steps on the Proxmox host(s) you want to remotely unlock:
+Install mandos-client:
+
+```bash
+apt upgrade && apt install mandos-client -y
+```
+
+Run the mandos-keygen for generating certificate and keys, and provide your LUKS password.
+
+```bash
+mandos-keygen --force --password
+```
+
+It will output a block of text, this you will copy manually to the end to the Mandos server's `/etc/mandos/clients.conf` file.
+
+Update initramfs to include Mandos client:
+
+```bash
+update-initramfs -u -k all
+```
+
+### Server side
+
+Install mandos server from the apt repositories of your Debian or Ubuntu based system:
+Prefix `sudo` if you are not logged in as root.
+
+```bash
+apt update && apt install mandos -y
+```
+
+Edit `/etc/mandos/clients.conf` using a text editor e.g `nano` and copy the secret from `mandos-keygen` to the end of file:
+
+```bash
+nano /etc/mandos/clients.conf
+```
+
+Mandos Server performs checks to see if the clients are online, and it does so by using DNS hostname.
+Check if you can reach the DNS name of your your PVE host from the Mandos server.
+
+```bash
+ping <your-DNS-hostname>
+```
+
+If not reachable you can edit the `host = xxxxxxx.xxx` in the `/etc/mandos/clients.conf` and switch it for the IP address of the PVE host.
+But the preferred way is either to make the hostname resolve by setting it in your router, or edit the `/etc/hosts` file on the Mandos server and enter the IP and hostname on a new line.
+
+```bash
+nano /etc/hosts
+```
+
+Enable Mandos systemd service and start Mandos server:
+
+```bash
+systemctl enable mandos.service --now
+```
+
+Now you can reboot your encrypted PVE host and it will unlock the encrypted root filesystem automatically.
+If you want to change settings like timeouts, please refer to the manpages or https://www.recompile.se/mandos#The_Manual_Pages
 
 # Enable LUKS for other disks/partitions
 

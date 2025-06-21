@@ -627,28 +627,37 @@ cryptsetup open /dev/sda3 luks-sda3
 zpool import -f -d /dev/mapper -R /mnt rpool    # mount it under /mnt
 ```
 
+Get the UUID for the encrypted partition, copy without quotation marks.
+Make sure not to use PARTUUID.
+```bash
+blkid | grep "/dev/[a-z0-9]*3" | grep -v "/dev/zd"
+```
+
 Edit `crypttab`
 
 ```bash
 nano /mnt/etc/crypttab
-
-# Inside put:
-luks-sda3  UUID=<luks-uuid>  none  luks,discard,initramfs
-
-blkid /dev/sda3 >> /mnt/etc/crypttab
-# Cut the UUID from that line just inserted into the file and format it like above
 ```
 
-Edit `/etc/kernel/cmdline` (For a systemd boot system)
+Enter the following, replace `<luks-uuid>` with the UUID you got in the above command.
+```bash
+luks-sda3  UUID=<luks-uuid>  none  luks,discard,initramfs
+```
 
+Now we need to change the kernel command line to point the root volume to the encrypte partition.
+
+Edit `/etc/kernel/cmdline` (For a systemd boot system)
 ```bash
 nano /mnt/etc/kernel/cmdline
+```
+Normally it looks like:
+`root=ZFS=rpool/ROOT/pve-1 boot=zfs`
 
-# Normally it looks like:
-root=ZFS=rpool/ROOT/pve-1 boot=zfs
+But it needs to have the luks stuff in it now.
+Make sure to use persistent device UUID without quotation marks.
 
-# But it needs to have the luks stuff in it now like:
-cryptdevice=/dev/sda3:luks-sda3 root=ZFS=rpool/ROOT/pve-1 resume=/dev/mapper/luks-sda3 boot=zfs
+```bash
+cryptdevice=UUID=<luks-uuid>:luks-sda3 root=ZFS=rpool/ROOT/pve-1 resume=/dev/mapper/luks-sda3 boot=zfs
 ```
 
 Add `dmcrypt` to `/mnt/etc/initramfs-tools/modules`. This'll take a few steps as we need to regenerate the initiramdisk from inside the live ISO via `chroot`
@@ -960,11 +969,11 @@ root=ZFS=rpool/ROOT/pve-1 boot=zfs
 ```
 
 Then overwrite the kernel cmdline file `/etc/kernel/cmdline` with this command. Make sure you add all partitions that are in the `rpool` (root ZFS pool) and need to be decrypted on boot:
-
+Make sure you use the UUID of the encrypted disk you got in the above command, without quotation marks.
 ```bash
 # For ZFS (RAID1), ZFS (RAID10), ZFS (RAIDZ-1), ZFS (RAIDZ-2), ZFS (RAIDZ-3)
 # You need to add all ZFS partitions of the rpool (root ZFS pool)
-echo 'cryptdevice=/dev/sda3:luks-sda3 cryptdevice=/dev/sdb3:luks-sdb3 root=ZFS=rpool/ROOT/pve-1 resume=/dev/mapper/luks-sda3 resume=/dev/mapper/luks-sdb3 boot=zfs' > /etc/kernel/cmdline
+echo 'cryptdevice=UUID=************:luks-sda3 cryptdevice=UUID=************:luks-sdb3 root=ZFS=rpool/ROOT/pve-1 resume=/dev/mapper/luks-sda3 resume=/dev/mapper/luks-sdb3 boot=zfs' > /etc/kernel/cmdline
 ```
 
 Add module to initramfs file `/etc/initramfs-tools/modules`:
@@ -1139,7 +1148,7 @@ Perform the following steps on the Proxmox host(s) you want to remotely unlock:
 Install mandos-client:
 
 ```bash
-apt upgrade && apt install mandos-client -y
+apt update && apt install mandos-client -y
 ```
 
 Run the mandos-keygen for generating certificate and keys, and provide your LUKS password.
